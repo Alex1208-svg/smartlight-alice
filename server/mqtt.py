@@ -1,15 +1,15 @@
 import ssl
+import json
 import paho.mqtt.publish as publish
-
 from config import *
 
-def send(command):
+def send(data):
 
-    print("MQTT SEND:", command)
+    print("MQTT SEND:", data)
 
     publish.single(
         MQTT_TOPIC,
-        command,
+        json.dumps(data),
         hostname=MQTT_HOST,
         port=MQTT_PORT,
         auth={
