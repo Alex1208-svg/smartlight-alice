@@ -1,44 +1,33 @@
 from flask import request, jsonify
 from mqtt import send
+import state
 
 def action():
+    data = request.json
 
-    data = request.get_json(force=True)
+    value = data["payload"]["devices"][0]["capabilities"][0]["state"]["value"]
 
-    print("REQUEST:", data)
+    state.state = value
 
-    try:
-        device = data["payload"]["devices"][0]
-        state = device["capabilities"][0]["state"]
-        value = state["value"]
+    if value:
+        send("ON")
+    else:
+        send("OFF")
 
-        if value:
-            send("ON")
-        else:
-            send("OFF")
-
-        return jsonify({
-            "request_id": data.get("request_id", ""),
-            "payload": {
-                "devices": [
-                    {
-                        "id": device["id"],
-                        "capabilities": [
-                            {
-                                "type": "devices.capabilities.on_off",
-                                "state": {
-                                    "instance": "on",
-                                    "action_result": {
-                                        "status": "DONE"
-                                    }
-                                }
-                            }
-                        ]
+    return jsonify({
+        "request_id": data["payload"]["action_id"],
+        "payload": {
+            "devices": [{
+                "id": "smartlight",
+                "capabilities": [{
+                    "type": "devices.capabilities.on_off",
+                    "state": {
+                        "instance": "on",
+                        "action_result": {
+                            "status": "DONE"
+                        }
                     }
-                ]
-            }
-        })
-
-    except Exception as e:
-        print("ERROR:", e)
-        raise
+                }]
+            }]
+        }
+    })
