@@ -1,56 +1,44 @@
 from flask import request, jsonify
-
 from mqtt import send
 
 def action():
 
-    data = request.json
+    data = request.get_json(force=True)
 
-    value = data["payload"]["devices"][0]["capabilities"][0]["state"]["value"]
+    print("REQUEST:", data)
 
-    if value:
-        send("ON")
-    else:
-        send("OFF")
+    try:
+        device = data["payload"]["devices"][0]
+        state = device["capabilities"][0]["state"]
+        value = state["value"]
 
-    return jsonify({
+        if value:
+            send("ON")
+        else:
+            send("OFF")
 
-        "request_id": data["request_id"],
-
-        "payload": {
-
-            "devices": [
-
-                {
-
-                    "id": "smartlight",
-
-                    "capabilities": [
-
-                        {
-
-                            "type": "devices.capabilities.on_off",
-
-                            "state": {
-
-                                "instance": "on",
-
-                                "action_result": {
-
-                                    "status": "DONE"
-
+        return jsonify({
+            "request_id": data.get("request_id", ""),
+            "payload": {
+                "devices": [
+                    {
+                        "id": device["id"],
+                        "capabilities": [
+                            {
+                                "type": "devices.capabilities.on_off",
+                                "state": {
+                                    "instance": "on",
+                                    "action_result": {
+                                        "status": "DONE"
+                                    }
                                 }
-
                             }
+                        ]
+                    }
+                ]
+            }
+        })
 
-                        }
-
-                    ]
-
-                }
-
-            ]
-
-        }
-
-    })
+    except Exception as e:
+        print("ERROR:", e)
+        raise
