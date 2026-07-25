@@ -4,6 +4,9 @@ import paho.mqtt.publish as publish
 from config import *
 
 def send(command):
+
+    print("MQTT SEND:", command)
+
     publish.single(
         MQTT_TOPIC,
         command,
@@ -17,3 +20,5 @@ def send(command):
             "tls_version": ssl.PROTOCOL_TLS
         }
     )
+
+    print("MQTT OK")
