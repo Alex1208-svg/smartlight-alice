@@ -1,23 +1,41 @@
-from flask import request
+from flask import jsonify
 
 def query():
 
-    return {
-        "request_id": request.headers.get("X-Request-Id", ""),
+    return jsonify({
+
+        "request_id": "1",
+
         "payload": {
+
             "devices": [
+
                 {
-                    "id": "lamp",
+
+                    "id": "smartlight",
+
                     "capabilities": [
+
                         {
+
                             "type": "devices.capabilities.on_off",
+
                             "state": {
+
                                 "instance": "on",
-                                "value": True
+
+                                "value": False
+
                             }
+
                         }
+
                     ]
+
                 }
+
             ]
+
         }
-    }
+
+    })
