@@ -1,4 +1,5 @@
-from flask import request
+from flask import request, jsonify
+
 from mqtt import send
 
 def action():
@@ -12,24 +13,44 @@ def action():
     else:
         send("OFF")
 
-    return {
-        "request_id": request.headers.get("X-Request-Id", ""),
+    return jsonify({
+
+        "request_id": data["request_id"],
+
         "payload": {
+
             "devices": [
+
                 {
-                    "id": "lamp",
+
+                    "id": "smartlight",
+
                     "capabilities": [
+
                         {
+
                             "type": "devices.capabilities.on_off",
+
                             "state": {
+
                                 "instance": "on",
+
                                 "action_result": {
+
                                     "status": "DONE"
+
                                 }
+
                             }
+
                         }
+
                     ]
+
                 }
+
             ]
+
         }
-    }
+
+    })
