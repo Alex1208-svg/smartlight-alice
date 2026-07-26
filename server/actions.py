@@ -2,6 +2,7 @@ from flask import request, jsonify
 from mqtt import send
 import json
 
+print("############ ACTIONS V2 LOADED ############")
 
 def action():
 
