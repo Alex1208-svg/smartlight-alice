@@ -2,7 +2,7 @@ import os
 import json
 import ssl
 import time
-import paho.mqtt.client as mqtt
+import paho.mqtt.publish as publish
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
@@ -16,46 +16,36 @@ MQTT_TOPIC = "smartlight/lamp"
 
 DEVICE_ID = "smartlight"
 
-mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
-
-
-def on_connect(client, userdata, flags, rc):
-    print("MQTT CONNECTED, rc =", rc)
-
-
-def on_disconnect(client, userdata, rc):
-    print("MQTT DISCONNECTED, rc =", rc)
-
-
-mqtt_client.on_connect = on_connect
-mqtt_client.on_disconnect = on_disconnect
-
-mqtt_client.username_pw_set(MQTT_USER, MQTT_PASS)
-mqtt_client.tls_set(cert_reqs=ssl.CERT_NONE, tls_version=ssl.PROTOCOL_TLS_CLIENT)
-mqtt_client.tls_insecure_set(True)
-mqtt_client.connect(MQTT_HOST, MQTT_PORT, 60)
-mqtt_client.loop_start()
-
-
-def ensure_mqtt_connected():
-    if not mqtt_client.is_connected():
-        print("MQTT not connected, reconnecting...")
-        try:
-            mqtt_client.reconnect()
-            time.sleep(1)  # даём время на handshake
-        except Exception as e:
-            print("MQTT reconnect failed:", e)
+# Названия цветов, которые присылает Алиса вместо числового RGB
+NAMED_COLORS = {
+    "red": "FF0000", "orange": "FF8000", "yellow": "FFFF00",
+    "green": "00FF00", "emerald": "00FF80", "turquoise": "00FFFF",
+    "cyan": "00FFFF", "blue": "0000FF", "violet": "8000FF",
+    "purple": "FF00FF", "pink": "FF0080", "raspberry": "FF0040",
+    "white": "FFFFFF", "warm_white": "FFF4E0", "cold_white": "E0F0FF",
+}
 
 
 def mqtt_send(payload: dict):
+    """Подключается к брокеру заново, публикует одно сообщение и отключается.
+    Это надёжнее постоянного соединения на бесплатном хостинге, где процесс
+    периодически троттлится по CPU и фоновый поток не успевает слать keepalive."""
     msg = json.dumps(payload)
     print("MQTT SEND:", msg)
-
-    ensure_mqtt_connected()
-
-    result = mqtt_client.publish(MQTT_TOPIC, payload=msg, qos=1, retain=False)
-    print("MQTT PUBLISH rc =", result.rc)
-    print("MQTT is_connected() AFTER publish =", mqtt_client.is_connected())
+    try:
+        publish.single(
+            MQTT_TOPIC,
+            payload=msg,
+            qos=1,
+            hostname=MQTT_HOST,
+            port=MQTT_PORT,
+            auth={'username': MQTT_USER, 'password': MQTT_PASS},
+            tls={'cert_reqs': ssl.CERT_NONE, 'tls_version': ssl.PROTOCOL_TLS_CLIENT},
+            client_id="render-" + str(int(time.time() * 1000)),
+        )
+        print("MQTT publish OK")
+    except Exception as e:
+        print("MQTT publish FAILED:", e)
 
 
 # ====================== ХРАНИЛИЩЕ ТЕКУЩЕГО СОСТОЯНИЯ ======================
@@ -207,11 +197,11 @@ def devices_query():
 
 @app.route('/v1.0/user/devices/action', methods=['POST'])
 def devices_action():
-    data = request.get_json()                                  # ← сначала получаем data
+    data = request.get_json()
     request_id = request.headers.get('X-Request-Id', '')
 
     print("\n========== ACTION ==========")
-    print(json.dumps(data, indent=2, ensure_ascii=False))       # ← теперь печатаем без ошибки
+    print(json.dumps(data, indent=2, ensure_ascii=False))
 
     result_capabilities = []
     mqtt_payload = {}
@@ -242,6 +232,15 @@ def devices_action():
                     state['color_hex'] = rgb_to_hex(r, g, b)
                     mqtt_payload['color'] = f"#{state['color_hex']}"
                     mqtt_payload['effect'] = 'static'
+
+                elif instance == 'color':
+                    # Алиса иногда шлёт название цвета строкой, а не число RGB
+                    hex_color = NAMED_COLORS.get(str(value).lower())
+                    if hex_color:
+                        state['color_hex'] = hex_color
+                        mqtt_payload['color'] = f"#{hex_color}"
+                        mqtt_payload['effect'] = 'static'
+
                 elif instance == 'scene':
                     if value == 'party':
                         mqtt_payload['effect'] = 'rainbow'
