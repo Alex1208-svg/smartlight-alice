@@ -5,48 +5,66 @@ from config import *
 
 def send(data):
 
-    print("===== NEW MQTT.PY =====")
-    
+    print("\n========== MQTT DEBUG ==========")
+
     payload = json.dumps(data)
 
-    print("HOST =", MQTT_HOST)
-    print("PORT =", MQTT_PORT)
-    print("USER =", MQTT_USER)
-    print("TOPIC =", MQTT_TOPIC)
-    print("PAYLOAD =", payload)
+    print("HOST    :", MQTT_HOST)
+    print("PORT    :", MQTT_PORT)
+    print("USER    :", MQTT_USER)
+    print("TOPIC   :", MQTT_TOPIC)
+    print("PAYLOAD :", payload)
 
     client = mqtt.Client(
         client_id="render-debug",
         protocol=mqtt.MQTTv311
     )
 
-    client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
+    client.username_pw_set(
+        MQTT_USER,
+        MQTT_PASSWORD
+    )
 
     client.tls_set(
         tls_version=ssl.PROTOCOL_TLS_CLIENT
     )
 
-    client.connect(MQTT_HOST, MQTT_PORT, 60)
+    def on_connect(client, userdata, flags, rc):
+        print("CONNECT RC =", rc)
 
-    print("CONNECTED")
+    client.on_connect = on_connect
 
-print("==========================")
-print("HOST =", MQTT_HOST)
-print("PORT =", MQTT_PORT)
-print("USER =", MQTT_USER)
-print("TOPIC =", MQTT_TOPIC)
-print("PAYLOAD =", payload)
-print("==========================")
-    
-    rc = client.publish(
+    print("Connecting...")
+
+    client.connect(
+        MQTT_HOST,
+        MQTT_PORT,
+        60
+    )
+
+    client.loop_start()
+
+    import time
+    time.sleep(1)
+
+    print("Publishing...")
+
+    info = client.publish(
         MQTT_TOPIC,
         payload,
         qos=0,
         retain=False
     )
 
-    client.loop(1)
+    info.wait_for_publish()
 
-    print("publish rc =", rc.rc)
+    print("Publish rc =", info.rc)
+    print("Published  =", info.is_published())
 
+    time.sleep(1)
+
+    client.loop_stop()
     client.disconnect()
+
+    print("Disconnected")
+    print("========== END MQTT ==========\n")
