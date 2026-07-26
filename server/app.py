@@ -25,32 +25,13 @@ NAMED_COLORS = {
     "white": "FFFFFF", "warm_white": "FFF4E0", "cold_white": "E0F0FF",
 }
 
-
-def mqtt_send(payload: dict):
-    msg = json.dumps(payload)
-    print("MQTT SEND:", msg)
-    try:
-        publish.single(
-            MQTT_TOPIC,
-            payload=msg,
-            qos=1,
-            retain=True,          # ← было False, стало True
-            hostname=MQTT_HOST,
-            port=MQTT_PORT,
-            auth={'username': MQTT_USER, 'password': MQTT_PASS},
-            tls={'cert_reqs': ssl.CERT_NONE, 'tls_version': ssl.PROTOCOL_TLS_CLIENT},
-            client_id="render-" + str(int(time.time() * 1000)),
-        )
-        print("MQTT publish OK")
-    except Exception as e:
-        print("MQTT publish FAILED:", e)
-
-
 # ====================== ХРАНИЛИЩЕ ТЕКУЩЕГО СОСТОЯНИЯ ======================
+# effect: "static" | "rainbow" | "fire"
 state = {
     "on": False,
     "brightness": 100,
     "color_hex": "FFFFFF",
+    "effect": "static",
 }
 
 
@@ -63,6 +44,35 @@ def hex_to_rgb(hex_str):
     return int(hex_str[0:2], 16), int(hex_str[2:4], 16), int(hex_str[4:6], 16)
 
 
+def publish_full_state():
+    """Публикует ПОЛНОЕ состояние лампы одним retained-сообщением.
+    Благодаря retain=True, при любом переподключении ESP8266 брокер
+    сразу отдаёт этот снимок состояния — без опроса и дополнительной логики."""
+    payload = {
+        "power": state['on'],
+        "brightness": int(round(state['brightness'] * 255 / 100)),
+        "color": f"#{state['color_hex']}",
+        "effect": state['effect'],
+    }
+    msg = json.dumps(payload)
+    print("MQTT SEND (full state):", msg)
+    try:
+        publish.single(
+            MQTT_TOPIC,
+            payload=msg,
+            qos=1,
+            retain=True,
+            hostname=MQTT_HOST,
+            port=MQTT_PORT,
+            auth={'username': MQTT_USER, 'password': MQTT_PASS},
+            tls={'cert_reqs': ssl.CERT_NONE, 'tls_version': ssl.PROTOCOL_TLS_CLIENT},
+            client_id="render-" + str(int(time.time() * 1000)),
+        )
+        print("MQTT publish OK")
+    except Exception as e:
+        print("MQTT publish FAILED:", e)
+
+
 # ====================== СЛУЖЕБНОЕ ======================
 
 @app.route('/')
@@ -73,14 +83,14 @@ def index():
 @app.route('/on')
 def manual_on():
     state['on'] = True
-    mqtt_send({'power': True})
+    publish_full_state()
     return "OK", 200
 
 
 @app.route('/off')
 def manual_off():
     state['on'] = False
-    mqtt_send({'power': False})
+    publish_full_state()
     return "OK", 200
 
 
@@ -202,8 +212,6 @@ def devices_action():
     print(json.dumps(data, indent=2, ensure_ascii=False))
 
     result_capabilities = []
-    mqtt_payload = {}
-
     devices = data.get('payload', {}).get('devices', [])
 
     for device in devices:
@@ -215,11 +223,9 @@ def devices_action():
 
             if cap_type == 'devices.capabilities.on_off':
                 state['on'] = bool(value)
-                mqtt_payload['power'] = bool(value)
 
             elif cap_type == 'devices.capabilities.range' and instance == 'brightness':
                 state['brightness'] = int(value)
-                mqtt_payload['brightness'] = int(round(int(value) * 255 / 100))
 
             elif cap_type == 'devices.capabilities.color_setting':
                 if instance == 'rgb':
@@ -228,22 +234,20 @@ def devices_action():
                     g = (rgb_int >> 8) & 0xFF
                     b = rgb_int & 0xFF
                     state['color_hex'] = rgb_to_hex(r, g, b)
-                    mqtt_payload['color'] = f"#{state['color_hex']}"
-                    mqtt_payload['effect'] = 'static'
+                    state['effect'] = 'static'
 
                 elif instance == 'color':
                     # Алиса иногда шлёт название цвета строкой, а не число RGB
                     hex_color = NAMED_COLORS.get(str(value).lower())
                     if hex_color:
                         state['color_hex'] = hex_color
-                        mqtt_payload['color'] = f"#{hex_color}"
-                        mqtt_payload['effect'] = 'static'
+                        state['effect'] = 'static'
 
                 elif instance == 'scene':
                     if value == 'party':
-                        mqtt_payload['effect'] = 'rainbow'
+                        state['effect'] = 'rainbow'
                     elif value == 'movie':
-                        mqtt_payload['effect'] = 'fire'
+                        state['effect'] = 'fire'
 
             result_capabilities.append({
                 "type": cap_type,
@@ -253,8 +257,8 @@ def devices_action():
                 }
             })
 
-    if mqtt_payload:
-        mqtt_send(mqtt_payload)
+    # Всегда публикуем ПОЛНОЕ состояние одним retained-сообщением
+    publish_full_state()
 
     return jsonify({
         "request_id": request_id,
