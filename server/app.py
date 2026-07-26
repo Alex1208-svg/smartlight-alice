@@ -17,56 +17,31 @@ DEVICE_ID = "smartlight"
 
 mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
 
+
 def on_connect(client, userdata, flags, rc):
-    print("========== MQTT CONNECT ==========")
-    print("RC =", rc)
-    print("Connected =", rc == 0)
-    print("==================================")
+    print("MQTT CONNECTED, rc =", rc)
+
 
 def on_disconnect(client, userdata, rc):
-    print("MQTT DISCONNECT RC =", rc)
+    print("MQTT DISCONNECTED, rc =", rc)
+
 
 mqtt_client.on_connect = on_connect
 mqtt_client.on_disconnect = on_disconnect
 
 mqtt_client.username_pw_set(MQTT_USER, MQTT_PASS)
-
-mqtt_client.tls_set(
-    cert_reqs=ssl.CERT_NONE,
-    tls_version=ssl.PROTOCOL_TLS_CLIENT
-)
-
+mqtt_client.tls_set(cert_reqs=ssl.CERT_NONE, tls_version=ssl.PROTOCOL_TLS_CLIENT)
 mqtt_client.tls_insecure_set(True)
-
 mqtt_client.connect(MQTT_HOST, MQTT_PORT, 60)
-
 mqtt_client.loop_start()
 
 
-def mqtt_send(payload):
-
+def mqtt_send(payload: dict):
     msg = json.dumps(payload)
-
-    print("\n========== MQTT SEND ==========")
-    print("HOST =", MQTT_HOST)
-    print("PORT =", MQTT_PORT)
-    print("TOPIC =", MQTT_TOPIC)
-    print("PAYLOAD =", msg)
-    print("CONNECTED =", mqtt_client.is_connected())
-
-    info = mqtt_client.publish(
-        MQTT_TOPIC,
-        payload=msg,
-        qos=1,
-        retain=False
-    )
-
+    print("MQTT SEND:", msg)
+    info = mqtt_client.publish(MQTT_TOPIC, payload=msg, qos=1, retain=False)
     info.wait_for_publish()
-
-    print("MID =", info.mid)
-    print("RC =", info.rc)
-    print("PUBLISHED =", info.is_published())
-    print("===============================\n")
+    print("MQTT PUBLISHED =", info.is_published())
 
 
 # ====================== ХРАНИЛИЩЕ ТЕКУЩЕГО СОСТОЯНИЯ ======================
@@ -74,7 +49,6 @@ state = {
     "on": False,
     "brightness": 100,
     "color_hex": "FFFFFF",
-    "scene": None,
 }
 
 
@@ -108,7 +82,7 @@ def manual_off():
     return "OK", 200
 
 
-# ====================== OAUTH (упрощённый, для навыка) ======================
+# ====================== OAUTH ======================
 
 @app.route('/oauth/authorize')
 def oauth_authorize():
@@ -219,10 +193,11 @@ def devices_query():
 
 @app.route('/v1.0/user/devices/action', methods=['POST'])
 def devices_action():
-    print("\n========== ACTION ==========")
-    print(json.dumps(data, indent=4, ensure_ascii=False))
+    data = request.get_json()                                  # ← сначала получаем data
     request_id = request.headers.get('X-Request-Id', '')
-    data = request.get_json()
+
+    print("\n========== ACTION ==========")
+    print(json.dumps(data, indent=2, ensure_ascii=False))       # ← теперь печатаем без ошибки
 
     result_capabilities = []
     mqtt_payload = {}
@@ -254,10 +229,9 @@ def devices_action():
                     mqtt_payload['color'] = f"#{state['color_hex']}"
                     mqtt_payload['effect'] = 'static'
                 elif instance == 'scene':
-                    scene = value
-                    if scene == 'party':
+                    if value == 'party':
                         mqtt_payload['effect'] = 'rainbow'
-                    elif scene == 'movie':
+                    elif value == 'movie':
                         mqtt_payload['effect'] = 'fire'
 
             result_capabilities.append({
@@ -269,7 +243,6 @@ def devices_action():
             })
 
     if mqtt_payload:
-        print("MQTT PAYLOAD =", mqtt_payload)
         mqtt_send(mqtt_payload)
 
     return jsonify({
