@@ -15,19 +15,58 @@ MQTT_TOPIC = "smartlight/lamp"
 
 DEVICE_ID = "smartlight"
 
-mqtt_client = mqtt.Client()
+mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
+
+def on_connect(client, userdata, flags, rc):
+    print("========== MQTT CONNECT ==========")
+    print("RC =", rc)
+    print("Connected =", rc == 0)
+    print("==================================")
+
+def on_disconnect(client, userdata, rc):
+    print("MQTT DISCONNECT RC =", rc)
+
+mqtt_client.on_connect = on_connect
+mqtt_client.on_disconnect = on_disconnect
+
 mqtt_client.username_pw_set(MQTT_USER, MQTT_PASS)
-mqtt_client.tls_set(cert_reqs=ssl.CERT_NONE)  # для простоты, как и на ESP — без проверки сертификата
+
+mqtt_client.tls_set(
+    cert_reqs=ssl.CERT_NONE,
+    tls_version=ssl.PROTOCOL_TLS_CLIENT
+)
+
 mqtt_client.tls_insecure_set(True)
-mqtt_client.connect(MQTT_HOST, MQTT_PORT, keepalive=60)
+
+mqtt_client.connect(MQTT_HOST, MQTT_PORT, 60)
+
 mqtt_client.loop_start()
 
 
-def mqtt_send(payload: dict):
+def mqtt_send(payload):
+
     msg = json.dumps(payload)
-    print("MQTT SEND:", msg)
-    mqtt_client.publish(MQTT_TOPIC, msg)
-    print("MQTT OK")
+
+    print("\n========== MQTT SEND ==========")
+    print("HOST =", MQTT_HOST)
+    print("PORT =", MQTT_PORT)
+    print("TOPIC =", MQTT_TOPIC)
+    print("PAYLOAD =", msg)
+    print("CONNECTED =", mqtt_client.is_connected())
+
+    info = mqtt_client.publish(
+        MQTT_TOPIC,
+        payload=msg,
+        qos=1,
+        retain=False
+    )
+
+    info.wait_for_publish()
+
+    print("MID =", info.mid)
+    print("RC =", info.rc)
+    print("PUBLISHED =", info.is_published())
+    print("===============================\n")
 
 
 # ====================== ХРАНИЛИЩЕ ТЕКУЩЕГО СОСТОЯНИЯ ======================
@@ -180,6 +219,8 @@ def devices_query():
 
 @app.route('/v1.0/user/devices/action', methods=['POST'])
 def devices_action():
+    print("\n========== ACTION ==========")
+    print(json.dumps(data, indent=4, ensure_ascii=False))
     request_id = request.headers.get('X-Request-Id', '')
     data = request.get_json()
 
@@ -228,6 +269,7 @@ def devices_action():
             })
 
     if mqtt_payload:
+        print("MQTT PAYLOAD =", mqtt_payload)
         mqtt_send(mqtt_payload)
 
     return jsonify({
