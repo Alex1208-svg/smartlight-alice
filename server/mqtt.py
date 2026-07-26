@@ -9,20 +9,32 @@ def send(data):
 
     print("HOST =", MQTT_HOST)
     print("PORT =", MQTT_PORT)
-    print("TOPIC =", MQTT_TOPIC)
     print("USER =", MQTT_USER)
+    print("TOPIC =", MQTT_TOPIC)
     print("PAYLOAD =", payload)
 
-    client = mqtt.Client()
+    client = mqtt.Client(
+        client_id="render-debug",
+        protocol=mqtt.MQTTv311
+    )
 
     client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
 
-    client.tls_set(tls_version=ssl.PROTOCOL_TLS)
+    client.tls_set(
+        tls_version=ssl.PROTOCOL_TLS_CLIENT
+    )
 
-    client.connect(MQTT_HOST, MQTT_PORT)
+    client.connect(MQTT_HOST, MQTT_PORT, 60)
 
-    r = client.publish(MQTT_TOPIC, payload)
+    rc = client.publish(
+        MQTT_TOPIC,
+        payload,
+        qos=0,
+        retain=False
+    )
 
-    print("publish rc =", r.rc)
+    client.loop(1)
+
+    print("publish rc =", rc.rc)
 
     client.disconnect()
