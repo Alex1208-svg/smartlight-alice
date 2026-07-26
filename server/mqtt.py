@@ -1,43 +1,28 @@
 import ssl
 import json
-import paho.mqtt.publish as publish
-
+import paho.mqtt.client as mqtt
 from config import *
-
 
 def send(data):
 
     payload = json.dumps(data)
 
-    print("\n=========== MQTT DEBUG ===========")
-    print("HOST     :", MQTT_HOST)
-    print("PORT     :", MQTT_PORT)
-    print("USER     :", MQTT_USER)
-    print("PASSWORD :", MQTT_PASSWORD)
-    print("TOPIC    :", MQTT_TOPIC)
-    print("PAYLOAD  :", payload)
+    print("HOST =", MQTT_HOST)
+    print("PORT =", MQTT_PORT)
+    print("TOPIC =", MQTT_TOPIC)
+    print("USER =", MQTT_USER)
+    print("PAYLOAD =", payload)
 
-    try:
+    client = mqtt.Client()
 
-        publish.single(
-            topic=MQTT_TOPIC,
-            payload=payload,
-            hostname=MQTT_HOST,
-            port=MQTT_PORT,
-            auth={
-                "username": MQTT_USER,
-                "password": MQTT_PASSWORD
-            },
-            tls={
-                "tls_version": ssl.PROTOCOL_TLS
-            }
-        )
+    client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
 
-        print("PUBLISH OK")
+    client.tls_set(tls_version=ssl.PROTOCOL_TLS)
 
-    except Exception as e:
+    client.connect(MQTT_HOST, MQTT_PORT)
 
-        print("MQTT ERROR")
-        print(e)
+    r = client.publish(MQTT_TOPIC, payload)
 
-    print("==================================\n")
+    print("publish rc =", r.rc)
+
+    client.disconnect()
