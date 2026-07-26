@@ -27,9 +27,6 @@ NAMED_COLORS = {
 
 
 def mqtt_send(payload: dict):
-    """Подключается к брокеру заново, публикует одно сообщение и отключается.
-    Это надёжнее постоянного соединения на бесплатном хостинге, где процесс
-    периодически троттлится по CPU и фоновый поток не успевает слать keepalive."""
     msg = json.dumps(payload)
     print("MQTT SEND:", msg)
     try:
@@ -37,6 +34,7 @@ def mqtt_send(payload: dict):
             MQTT_TOPIC,
             payload=msg,
             qos=1,
+            retain=True,          # ← было False, стало True
             hostname=MQTT_HOST,
             port=MQTT_PORT,
             auth={'username': MQTT_USER, 'password': MQTT_PASS},
