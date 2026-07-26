@@ -5,6 +5,8 @@ from config import *
 
 def send(data):
 
+    print("===== NEW MQTT.PY =====")
+    
     payload = json.dumps(data)
 
     print("HOST =", MQTT_HOST)
@@ -25,6 +27,8 @@ def send(data):
     )
 
     client.connect(MQTT_HOST, MQTT_PORT, 60)
+
+    print("CONNECTED")
 
     rc = client.publish(
         MQTT_TOPIC,
