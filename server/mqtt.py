@@ -30,6 +30,14 @@ def send(data):
 
     print("CONNECTED")
 
+print("==========================")
+print("HOST =", MQTT_HOST)
+print("PORT =", MQTT_PORT)
+print("USER =", MQTT_USER)
+print("TOPIC =", MQTT_TOPIC)
+print("PAYLOAD =", payload)
+print("==========================")
+    
     rc = client.publish(
         MQTT_TOPIC,
         payload,
