@@ -2,7 +2,10 @@ from flask import request, jsonify
 from mqtt import send
 
 def action():
-
+  
+    import json
+    print(json.dumps(request.json, indent=4, ensure_ascii=False))
+    
     data = request.json
 
     print(data)
