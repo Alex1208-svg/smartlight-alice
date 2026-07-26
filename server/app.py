@@ -40,8 +40,11 @@ def mqtt_send(payload: dict):
     msg = json.dumps(payload)
     print("MQTT SEND:", msg)
     info = mqtt_client.publish(MQTT_TOPIC, payload=msg, qos=1, retain=False)
-    info.wait_for_publish()
-    print("MQTT PUBLISHED =", info.is_published())
+    try:
+        info.wait_for_publish(timeout=3)   # ждём максимум 3 секунды, не 30
+        print("MQTT PUBLISHED =", info.is_published())
+    except (ValueError, RuntimeError) as e:
+        print("MQTT PUBLISH TIMEOUT/ERROR:", e)
 
 
 # ====================== ХРАНИЛИЩЕ ТЕКУЩЕГО СОСТОЯНИЯ ======================
