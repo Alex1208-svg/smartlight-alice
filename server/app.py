@@ -1,6 +1,7 @@
 import os
 import json
 import ssl
+import time
 import paho.mqtt.client as mqtt
 from flask import Flask, request, jsonify
 
@@ -36,18 +37,25 @@ mqtt_client.connect(MQTT_HOST, MQTT_PORT, 60)
 mqtt_client.loop_start()
 
 
+def ensure_mqtt_connected():
+    if not mqtt_client.is_connected():
+        print("MQTT not connected, reconnecting...")
+        try:
+            mqtt_client.reconnect()
+            time.sleep(1)  # даём время на handshake
+        except Exception as e:
+            print("MQTT reconnect failed:", e)
+
+
 def mqtt_send(payload: dict):
     msg = json.dumps(payload)
     print("MQTT SEND:", msg)
-    print("MQTT is_connected() BEFORE publish =", mqtt_client.is_connected())
-    
+
+    ensure_mqtt_connected()
+
     result = mqtt_client.publish(MQTT_TOPIC, payload=msg, qos=1, retain=False)
     print("MQTT PUBLISH rc =", result.rc)
-    print("MQTT PUBLISH mid =", result.mid)
-    
-    time.sleep(0.5)
     print("MQTT is_connected() AFTER publish =", mqtt_client.is_connected())
-    print("MQTT is_published() =", result.is_published())
 
 
 # ====================== ХРАНИЛИЩЕ ТЕКУЩЕГО СОСТОЯНИЯ ======================
